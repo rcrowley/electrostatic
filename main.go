@@ -72,10 +72,12 @@ func main() {
 				"mergician -o %s %s %s\n",
 				out, *layout, in)
 		}
-		must(html.RenderFile(out, must2(html.Merge([]*html.Node{
-			in0,
-			must2(files.Parse(in)),
-		}, rules))))
+		if !*pretend {
+			must(html.RenderFile(out, must2(html.Merge([]*html.Node{
+				in0,
+				must2(files.Parse(in)),
+			}, rules))))
+		}
 	}
 }
 
