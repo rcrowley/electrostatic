@@ -35,7 +35,7 @@ electrostatic -i <input> -l <layout> -o <output> [-p] [-v]
 See also
 --------
 
-Electrostatic is part of the [Mergician](https://github.com/rcrowley/mergician) suite ot tools that manipulate HTML documents:
+Electrostatic is part of the [Mergician](https://github.com/rcrowley/mergician) suite of tools that manipulate HTML documents:
 
 * [Deadlinks](https://github.com/rcrowley/deadlinks): Scan a document root directory for dead links
 * [Frag](https://github.com/rcrowley/frag): Extract fragments of HTML documents
