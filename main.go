@@ -73,6 +73,7 @@ func main() {
 				out, *layout, in)
 		}
 		if !*pretend {
+			must(os.MkdirAll(filepath.Dir(out), 0777))
 			must(html.RenderFile(out, must2(html.Merge([]*html.Node{
 				in0,
 				must2(files.Parse(in)),
