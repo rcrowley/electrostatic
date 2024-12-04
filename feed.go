@@ -16,22 +16,27 @@ import (
 )
 
 type Feed struct {
-	Items []Item
-	URL   string
-	mu    sync.Mutex
-	t     time.Time
+	Author string // author name
+	Path   string // feed path within site URL, like "index.atom.xml"
+	Title  string // site title
+	URL    string // site URL, like "http://example.com"
+
+	Entries []Entry
+
+	mu sync.Mutex
+	t  time.Time
 }
 
 func (f *Feed) Add(date, path string, n *html.Node) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	i := sort.Search(len(f.Items), func(i int) bool { return f.Items[i].Date < date })
-	if i == len(f.Items) || f.Items[i].Path != path {
-		f.Items = append(f.Items, Item{})
-		copy(f.Items[i+1:], f.Items[i:])
-		f.Items[i].Date = date
-		f.Items[i].Path = path
-		f.Items[i].Node = n
+	i := sort.Search(len(f.Entries), func(i int) bool { return f.Entries[i].Date < date })
+	if i == len(f.Entries) || f.Entries[i].Path != path {
+		f.Entries = append(f.Entries, Entry{})
+		copy(f.Entries[i+1:], f.Entries[i:])
+		f.Entries[i].Date = date
+		f.Entries[i].Path = path
+		f.Entries[i].Node = n
 	}
 }
 
@@ -46,75 +51,84 @@ func (f *Feed) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 	if err != nil {
 		return err
 	}
-	n, err := html.ParseFile("index.html") // TODO parameterize "index.html" or at least make it aware of what directory it should be in
-	if err != nil {
-		return err
-	}
-	title := html.Find(n, html.IsAtom(atom.Title))
-	if title == nil {
-		return fmt.Errorf("no <title> in %s", "index.html")
-	}
 
-	// TODO <?xml version="1.0" encoding="UTF-8"?>
-	e.EncodeToken(xml.StartElement{xml.Name{Local: "rss"}, []xml.Attr{{xml.Name{Local: "version"}, "2.0"}}})
-	e.EncodeToken(xml.StartElement{xml.Name{Local: "channel"}, nil})
+	e.EncodeToken(xml.Header)
+	e.EncodeToken(xml.StartElement{xml.Name{Local: "feed"}, []xml.Attr{{xml.Name{Local: "xmlns"}, "http://www.w3.org/2005/Atom"}}})
+
+	e.EncodeToken(xml.StartElement{xml.Name{Local: "author"}, nil})
+	e.EncodeToken(xml.StartElement{xml.Name{Local: "name"}, nil})
+	e.EncodeToken(xml.CharData(f.Author))
+	e.EncodeToken(xml.EndElement{xml.Name{Local: "name"}})
+	e.EncodeToken(xml.EndElement{xml.Name{Local: "author"}})
+
+	e.EncodeToken(xml.StartElement{xml.Name{Local: "id"}, nil})
+	e.EncodeToken(xml.CharData(u.String()))
+	e.EncodeToken(xml.EndElement{xml.Name{Local: "id"}})
+
+	e.EncodeToken(xml.StartElement{xml.Name{Local: "link"}, []xml.Attr{
+		{xml.Name{Local: "href"}, u.String()},
+		{xml.Name{Local: "rel"}, "alternate"},
+	}})
+	e.EncodeToken(xml.EndElement{xml.Name{Local: "link"}}) // encoding/xml doesn't support self-closing tags
+	u.Path = f.Path
+	e.EncodeToken(xml.StartElement{xml.Name{Local: "link"}, []xml.Attr{
+		{xml.Name{Local: "href"}, u.String()},
+		{xml.Name{Local: "rel"}, "self"},
+	}})
+	e.EncodeToken(xml.EndElement{xml.Name{Local: "link"}}) // encoding/xml doesn't support self-closing tags
 
 	e.EncodeToken(xml.StartElement{xml.Name{Local: "title"}, nil})
-	e.EncodeToken(xml.CharData(html.Text(title).String()))
+	e.EncodeToken(xml.CharData(f.Title))
 	e.EncodeToken(xml.EndElement{xml.Name{Local: "title"}})
 
-	e.EncodeToken(xml.StartElement{xml.Name{Local: "description"}, nil})
-	e.EncodeToken(xml.CharData(""))
-	e.EncodeToken(xml.EndElement{xml.Name{Local: "description"}})
+	e.EncodeToken(xml.StartElement{xml.Name{Local: "updated"}, nil})
+	e.EncodeToken(xml.CharData(t.Format(time.RFC3339)))
+	e.EncodeToken(xml.EndElement{xml.Name{Local: "updated"}})
 
-	e.EncodeToken(xml.StartElement{xml.Name{Local: "link"}, nil})
-	e.EncodeToken(xml.CharData(u.String()))
-	e.EncodeToken(xml.EndElement{xml.Name{Local: "link"}})
-
-	e.EncodeToken(xml.StartElement{xml.Name{Local: "pubDate"}, nil})
-	e.EncodeToken(xml.CharData(t.Format(time.RFC1123)))
-	e.EncodeToken(xml.EndElement{xml.Name{Local: "pubDate"}})
-
-	for _, item := range f.Items {
-		article := html.Find(item.Node, html.IsAtom(atom.Article))
+	for _, entry := range f.Entries {
+		article := html.Find(entry.Node, html.IsAtom(atom.Article))
 		if article == nil {
-			return fmt.Errorf("no <article> in %s", item.Path)
+			return fmt.Errorf("no <article> in %s", entry.Path)
 		}
 		h1 := html.Find(article, html.IsAtom(atom.H1))
 		if h1 == nil {
-			return fmt.Errorf("no <h1> in %s", item.Path)
+			return fmt.Errorf("no <h1> in %s", entry.Path)
 		}
 
-		e.EncodeToken(xml.StartElement{xml.Name{Local: "item"}, nil})
+		e.EncodeToken(xml.StartElement{xml.Name{Local: "entry"}, nil})
+
+		u.Path = entry.Path
+		e.EncodeToken(xml.StartElement{xml.Name{Local: "id"}, nil})
+		e.EncodeToken(xml.CharData(u.String()))
+		e.EncodeToken(xml.EndElement{xml.Name{Local: "id"}})
+		e.EncodeToken(xml.StartElement{xml.Name{Local: "link"}, []xml.Attr{
+			{xml.Name{Local: "href"}, u.String()},
+			{xml.Name{Local: "rel"}, "alternate"},
+		}})
+		e.EncodeToken(xml.EndElement{xml.Name{Local: "link"}}) // encoding/xml doesn't support self-closing tags
 
 		e.EncodeToken(xml.StartElement{xml.Name{Local: "title"}, nil})
 		e.EncodeToken(xml.CharData(html.Text(h1).String()))
 		e.EncodeToken(xml.EndElement{xml.Name{Local: "title"}})
 
-		e.EncodeToken(xml.StartElement{xml.Name{Local: "description"}, nil})
-		e.EncodeToken(xml.CharData(html.Text(article).String()))
-		e.EncodeToken(xml.EndElement{xml.Name{Local: "description"}})
-
-		u.Path = item.Path
-		e.EncodeToken(xml.StartElement{xml.Name{Local: "link"}, nil})
-		e.EncodeToken(xml.CharData(u.String()))
-		e.EncodeToken(xml.EndElement{xml.Name{Local: "link"}})
-
-		e.EncodeToken(xml.StartElement{xml.Name{Local: "pubDate"}, nil})
-		if t, err := time.Parse(time.DateTime, item.Date); err == nil {
-			e.EncodeToken(xml.CharData(t.Format(time.RFC1123)))
-		} else if t, err := time.Parse(time.DateOnly, item.Date); err == nil {
-			e.EncodeToken(xml.CharData(t.Format(time.RFC1123)))
+		e.EncodeToken(xml.StartElement{xml.Name{Local: "updated"}, nil})
+		if t, err := time.Parse(time.DateTime, entry.Date); err == nil {
+			e.EncodeToken(xml.CharData(t.Format(time.RFC3339)))
+		} else if t, err := time.Parse(time.DateOnly, entry.Date); err == nil {
+			e.EncodeToken(xml.CharData(t.Format(time.RFC3339)))
 		} else {
-			log.Printf("error parsing date %q: %v", item.Date, err)
-			e.EncodeToken(xml.CharData(item.Date))
+			log.Printf("error parsing date %q: %v", entry.Date, err)
+			e.EncodeToken(xml.CharData(entry.Date))
 		}
-		e.EncodeToken(xml.EndElement{xml.Name{Local: "pubDate"}})
+		e.EncodeToken(xml.EndElement{xml.Name{Local: "updated"}})
 
-		e.EncodeToken(xml.EndElement{xml.Name{Local: "item"}})
+		e.EncodeToken(xml.StartElement{xml.Name{Local: "content"}, []xml.Attr{{xml.Name{Local: "type"}, "html"}}})
+		e.EncodeToken(xml.CharData(html.String(article)))
+		e.EncodeToken(xml.EndElement{xml.Name{Local: "content"}})
+
+		e.EncodeToken(xml.EndElement{xml.Name{Local: "entry"}})
 	}
-	e.EncodeToken(xml.EndElement{xml.Name{Local: "channel"}})
-	e.EncodeToken(xml.EndElement{xml.Name{Local: "rss"}})
+	e.EncodeToken(xml.EndElement{xml.Name{Local: "feed"}})
 	e.EncodeToken(xml.CharData("\n"))
 
 	e.Flush()
@@ -134,7 +148,7 @@ func (f *Feed) Render(w io.Writer) error {
 	return e.Encode(f)
 }
 
-type Item struct {
+type Entry struct {
 	Date, Path string
 	Node       *html.Node
 }

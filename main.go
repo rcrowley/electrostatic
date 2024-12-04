@@ -67,7 +67,13 @@ func Main(args []string, stdin io.Reader, stdout io.Writer) {
 
 	in0 := must2(html.ParseFile(*layout))
 
-	feed := &Feed{}
+	feed := &Feed{
+		Path: "index.atom.xml",       // TODO maybe parameterize
+		URL:  "https://rcrowley.org", // TODO definitely parameterize
+	}
+	if title := html.Find(in0, html.IsAtom(atom.Title)); title != nil {
+		feed.Title = html.Text(title).String()
+	}
 
 	if len(*rules) == 0 {
 		*rules = html.DefaultRules()
@@ -107,11 +113,11 @@ func Main(args []string, stdin io.Reader, stdout io.Writer) {
 	}
 	wg.Wait()
 
-	for _, item := range feed.Items {
+	for _, entry := range feed.Entries {
 		if *verbose {
 			fmt.Printf(
 				"frag %s %s # %s\n", // "frag %q %q # %s\n",
-				"<h1>", item.Path, item.Date,
+				"<h1>", entry.Path, entry.Date,
 			)
 		}
 	}
