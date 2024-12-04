@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"path/filepath"
 	"sort"
 	"sync"
 	"time"
@@ -28,6 +29,10 @@ type Feed struct {
 }
 
 func (f *Feed) Add(date, path string, n *html.Node) {
+	if filepath.Base(path) == "index.html" {
+		path = filepath.Dir(path) + "/"
+	}
+
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	i := sort.Search(len(f.Entries), func(i int) bool { return f.Entries[i].Date < date })
@@ -61,6 +66,7 @@ func (f *Feed) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 	e.EncodeToken(xml.EndElement{xml.Name{Local: "name"}})
 	e.EncodeToken(xml.EndElement{xml.Name{Local: "author"}})
 
+	u.Path = "/" // at the advice of <https://validator.w3.org/feed/>
 	e.EncodeToken(xml.StartElement{xml.Name{Local: "id"}, nil})
 	e.EncodeToken(xml.CharData(u.String()))
 	e.EncodeToken(xml.EndElement{xml.Name{Local: "id"}})

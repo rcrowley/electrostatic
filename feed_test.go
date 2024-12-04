@@ -72,8 +72,8 @@ func TestFeed(t *testing.T) {
 	<author>
 		<name>Author Name</name>
 	</author>
-	<id>http://example.com</id>
-	<link href="http://example.com" rel="alternate"></link>
+	<id>http://example.com/</id>
+	<link href="http://example.com/" rel="alternate"></link>
 	<link href="http://example.com/index.atom.xml" rel="self"></link>
 	<title>Site Name</title>
 	<updated>%s</updated>
@@ -103,5 +103,13 @@ func TestFeed(t *testing.T) {
 `, f.t.Format(time.RFC3339))
 	if actual != expected {
 		t.Fatalf("actual: %s != expected: %s", actual, expected)
+	}
+}
+
+func TestFeedAddIndexHTML(t *testing.T) {
+	f := &Feed{}
+	f.Add("1970-01-01", "test/index.html", nil)
+	if len(f.Entries) != 1 || f.Entries[0].Path != "test/" {
+		t.Fatalf("%+v", f.Entries)
 	}
 }
