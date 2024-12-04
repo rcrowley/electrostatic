@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"os"
@@ -13,19 +14,16 @@ import (
 	"github.com/rcrowley/mergician/html"
 )
 
-func init() {
-	log.SetFlags(0)
-}
-
-func main() {
-	input := flag.String("i", "", "directory containing input HTML and Markdown documents")
-	layout := flag.String("l", "", "")
-	output := flag.String("o", "", "document root directory where merged HTML documents will be placed")
-	pretend := flag.Bool("p", false, "pretend to process all the inputs but don't write any outputs; implies -v")
+func Main(args []string, stdin io.Reader, stdout io.Writer) {
+	flags := flag.NewFlagSet(args[0], flag.ExitOnError)
+	input := flags.String("i", "", "directory containing input HTML and Markdown documents")
+	layout := flags.String("l", "", "")
+	output := flags.String("o", "", "document root directory where merged HTML documents will be placed")
+	pretend := flags.Bool("p", false, "pretend to process all the inputs but don't write any outputs; implies -v")
 	rules := new(html.Rules)
-	flag.Var(rules, "r", "use a custom rule for merging inputs (overrides all defaults; may be repeated)")
-	verbose := flag.Bool("v", false, "verbose mode")
-	flag.Usage = func() {
+	flags.Var(rules, "r", "use a custom rule for merging inputs (overrides all defaults; may be repeated)")
+	verbose := flags.Bool("v", false, "verbose mode")
+	flags.Usage = func() {
 		fmt.Fprint(os.Stderr, `Usage: electrostatic -i <input> -l <layout> -o <output> [-p] [-r <rule>[...]] [-v]
   -i <input>   directory containing input HTML and Markdown documents
   -l <layout>  site layout HTML document
@@ -41,9 +39,9 @@ func main() {
   -v           verbose mode
 `)
 	}
-	flag.Parse()
-	if *input == "" || *layout == "" || *output == "" || flag.NArg() > 0 {
-		flag.Usage()
+	flags.Parse(args[1:])
+	if *input == "" || *layout == "" || *output == "" || flags.NArg() > 0 {
+		flags.Usage()
 		os.Exit(1)
 	}
 	if *pretend {
@@ -92,6 +90,14 @@ func main() {
 		must(html.RenderFile(outPathname, in))
 		}
 	}
+}
+
+func init() {
+	log.SetFlags(0)
+}
+
+func main() {
+	Main(os.Args, os.Stdin, os.Stdout)
 }
 
 func must(err error) {
