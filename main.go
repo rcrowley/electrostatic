@@ -22,13 +22,22 @@ func main() {
 	layout := flag.String("l", "", "")
 	output := flag.String("o", "", "document root directory where merged HTML documents will be placed")
 	pretend := flag.Bool("p", false, "pretend to process all the inputs but don't write any outputs; implies -v")
+	rules := new(html.Rules)
+	flag.Var(rules, "r", "use a custom rule for merging inputs (overrides all defaults; may be repeated)")
 	verbose := flag.Bool("v", false, "verbose mode")
 	flag.Usage = func() {
-		fmt.Fprint(os.Stderr, `Usage: electrostatic -i <input> -l <layout> -o <output> [-p] [-v]
+		fmt.Fprint(os.Stderr, `Usage: electrostatic -i <input> -l <layout> -o <output> [-p] [-r <rule>[...]] [-v]
   -i <input>   directory containing input HTML and Markdown documents
   -l <layout>  site layout HTML document
   -o <output>  document root directory where merged HTML documents will be placed
   -p           pretend to process all the inputs but don't write any outputs; implies -v
+  -r <rule>    use a custom rule for merging inputs (overrides all defaults;
+               may be repeated)
+               each rule is a destination HTML tag with optional attributes,
+               "=" or "+=", and a source HTML tag with optional attributes
+               default rules: <article class="body"> = <body>
+                              <div class="body"> = <body>
+                              <section class="body"> = <body>
   -v           verbose mode
 `)
 	}
@@ -58,26 +67,29 @@ func main() {
 
 	in0 := must2(html.ParseFile(*layout))
 
-	var rules []html.Rule // TODO -r option
-	if len(rules) == 0 {
-		rules = html.DefaultRules()
+	if len(*rules) == 0 {
+		*rules = html.DefaultRules()
 	}
 
 	for _, pathname := range l.Pathnames() {
-		in := filepath.Join(*input, pathname)
-		out := filepath.Join(*output, fmt.Sprint(strings.TrimSuffix(pathname, filepath.Ext(pathname)), ".html"))
+		inPathname := filepath.Join(*input, pathname)
+		outPathname := filepath.Join(*output, fmt.Sprint(strings.TrimSuffix(pathname, filepath.Ext(pathname)), ".html"))
+
+		in1 := must2(files.Parse(inPathname))
+		in := must2(html.Merge([]*html.Node{in0, in1}, *rules))
+
 		if *verbose {
 			fmt.Printf(
-				// "mergician -o %q %q %q\n",
-				"mergician -o %s %s %s\n",
-				out, *layout, in)
+				"mergician -o %s %s %s\n", // "mergician -o %q %q %q\n",
+				outPathname, *layout, inPathname,
+			)
 		}
-		if !*pretend {
-			must(os.MkdirAll(filepath.Dir(out), 0777))
-			must(html.RenderFile(out, must2(html.Merge([]*html.Node{
-				in0,
-				must2(files.Parse(in)),
-			}, rules))))
+		if *pretend {
+			continue
+		}
+
+		must(os.MkdirAll(filepath.Dir(outPathname), 0777))
+		must(html.RenderFile(outPathname, in))
 		}
 	}
 }
