@@ -13,6 +13,7 @@ import (
 
 	"github.com/rcrowley/mergician/files"
 	"github.com/rcrowley/mergician/html"
+	"golang.org/x/net/html/atom"
 )
 
 func Main(args []string, stdin io.Reader, stdout io.Writer) {
@@ -66,6 +67,8 @@ func Main(args []string, stdin io.Reader, stdout io.Writer) {
 
 	in0 := must2(html.ParseFile(*layout))
 
+	feed := &Feed{}
+
 	if len(*rules) == 0 {
 		*rules = html.DefaultRules()
 	}
@@ -88,6 +91,12 @@ func Main(args []string, stdin io.Reader, stdout io.Writer) {
 			in1 := must2(files.Parse(inPathname))
 			in := must2(html.Merge([]*html.Node{in0, in1}, *rules))
 
+			if a := html.Find(in, html.IsAtom(atom.Article)); a != nil {
+				if t := html.Find(a, html.IsAtom(atom.Time)); t != nil {
+					feed.Add(html.Attr(t, "datetime"), outPathname, in)
+				}
+			}
+
 			if *pretend {
 				return
 			}
@@ -97,6 +106,18 @@ func Main(args []string, stdin io.Reader, stdout io.Writer) {
 		}()
 	}
 	wg.Wait()
+
+	for _, item := range feed.Items {
+		if *verbose {
+			fmt.Printf(
+				"frag %s %s # %s\n", // "frag %q %q # %s\n",
+				"<h1>", item.Path, item.Date,
+			)
+		}
+	}
+	if !*pretend {
+		feed.Print()
+	}
 
 }
 
