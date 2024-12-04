@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/rcrowley/mergician/files"
 	"github.com/rcrowley/mergician/html"
@@ -69,27 +70,34 @@ func Main(args []string, stdin io.Reader, stdout io.Writer) {
 		*rules = html.DefaultRules()
 	}
 
+	var wg sync.WaitGroup
 	for _, pathname := range l.Pathnames() {
 		inPathname := filepath.Join(*input, pathname)
 		outPathname := filepath.Join(*output, fmt.Sprint(strings.TrimSuffix(pathname, filepath.Ext(pathname)), ".html"))
-
-		in1 := must2(files.Parse(inPathname))
-		in := must2(html.Merge([]*html.Node{in0, in1}, *rules))
-
 		if *verbose {
 			fmt.Printf(
 				"mergician -o %s %s %s\n", // "mergician -o %q %q %q\n",
 				outPathname, *layout, inPathname,
 			)
 		}
-		if *pretend {
-			continue
-		}
 
-		must(os.MkdirAll(filepath.Dir(outPathname), 0777))
-		must(html.RenderFile(outPathname, in))
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			in1 := must2(files.Parse(inPathname))
+			in := must2(html.Merge([]*html.Node{in0, in1}, *rules))
+
+			if *pretend {
+				return
+			}
+
+			must(os.MkdirAll(filepath.Dir(outPathname), 0777))
+			must(html.RenderFile(outPathname, in))
+		}()
 	}
+	wg.Wait()
+
 }
 
 func init() {
