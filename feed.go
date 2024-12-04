@@ -154,6 +154,15 @@ func (f *Feed) Render(w io.Writer) error {
 	return e.Encode(f)
 }
 
+func (f *Feed) RenderFile(pathname string) error {
+	file, err := os.Create(pathname)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	return f.Render(file)
+}
+
 type Entry struct {
 	Date, Path string
 	Node       *html.Node
