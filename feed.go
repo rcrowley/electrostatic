@@ -16,6 +16,8 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
+const FeedLength = 10
+
 type Feed struct {
 	Author string // author name
 	Path   string // feed path within site URL, like "index.atom.xml"
@@ -91,7 +93,12 @@ func (f *Feed) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 	e.EncodeToken(xml.CharData(t.Format(time.RFC3339)))
 	e.EncodeToken(xml.EndElement{xml.Name{Local: "updated"}})
 
+	var i int
 	for _, entry := range f.Entries {
+		i++
+		if i == FeedLength {
+			break
+		}
 		article := html.Find(entry.Node, html.IsAtom(atom.Article))
 		if article == nil {
 			return fmt.Errorf("no <article> in %s", entry.Path)
