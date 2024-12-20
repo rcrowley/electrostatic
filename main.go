@@ -13,23 +13,19 @@ import (
 
 	"github.com/rcrowley/mergician/files"
 	"github.com/rcrowley/mergician/html"
-	"golang.org/x/net/html/atom"
 )
 
 func Main(args []string, stdin io.Reader, stdout io.Writer) {
 	flags := flag.NewFlagSet(args[0], flag.ExitOnError)
-	author := flags.String("a", "", "author's name (used to build an Atom feed)")
 	input := flags.String("i", "", "directory containing input HTML and Markdown documents")
 	layout := flags.String("l", "", "")
 	output := flags.String("o", "", "document root directory where merged HTML documents will be placed")
 	pretend := flags.Bool("p", false, "pretend to process all the inputs but don't write any outputs; implies -v")
 	rules := new(html.Rules)
 	flags.Var(rules, "r", "use a custom rule for merging inputs (overrides all defaults; may be repeated)")
-	url := flags.String("u", "", "site URL with scheme and domain (used to build an Atom feed)")
 	verbose := flags.Bool("v", false, "verbose mode")
 	flags.Usage = func() {
-		fmt.Fprint(os.Stderr, `Usage: electrostatic [-a <author>] -i <input> -l <layout> -o <output> [-p] [-r <rule>[...]] [-u <url>] [-v]
-  -a <author>  author's name (used to build an Atom feed)
+		fmt.Fprint(os.Stderr, `Usage: electrostatic -i <input> -l <layout> -o <output> [-p] [-r <rule>[...]] [-v]
   -i <input>   directory containing input HTML and Markdown documents
   -l <layout>  site layout HTML document
   -o <output>  document root directory where merged HTML documents will be placed
@@ -41,7 +37,6 @@ func Main(args []string, stdin io.Reader, stdout io.Writer) {
                default rules: <article class="body"> = <body>
                               <div class="body"> = <body>
                               <section class="body"> = <body>
-  -u <url>     site URL with scheme and domain (used to build an Atom feed)
   -v           verbose mode
 
 Synopsis: electrostatic uses mergician to apply a consistent layout to a whole site.
@@ -73,15 +68,6 @@ Synopsis: electrostatic uses mergician to apply a consistent layout to a whole s
 
 	in0 := must2(html.ParseFile(*layout))
 
-	feed := &Feed{
-		Author: *author,
-		Path:   "index.atom.xml", // maybe parameterize
-		URL:    *url,
-	}
-	if title := html.Find(in0, html.IsAtom(atom.Title)); title != nil {
-		feed.Title = html.Text(title).String()
-	}
-
 	if len(*rules) == 0 {
 		*rules = html.DefaultRules()
 	}
@@ -104,12 +90,6 @@ Synopsis: electrostatic uses mergician to apply a consistent layout to a whole s
 			in1 := must2(files.Parse(inPathname))
 			in := must2(html.Merge([]*html.Node{in0, in1}, *rules))
 
-			if a := html.Find(in, html.IsAtom(atom.Article)); a != nil {
-				if t := html.Find(a, html.IsAtom(atom.Time)); t != nil {
-					feed.Add(html.Attr(t, "datetime"), outPathname, in)
-				}
-			}
-
 			if *pretend {
 				return
 			}
@@ -119,29 +99,6 @@ Synopsis: electrostatic uses mergician to apply a consistent layout to a whole s
 		}()
 	}
 	wg.Wait()
-
-	if *author != "" && *url != "" {
-		for _, entry := range feed.Entries {
-			if *verbose {
-				fmt.Printf(
-					"frag %s %s # %s\n", // "frag %q %q # %s\n",
-					"<h1>", entry.Path, entry.Date,
-				)
-				fmt.Printf(
-					"frag %s %s # %s\n", // "frag %q %q # %s\n",
-					"<article>", entry.Path, entry.Date,
-				)
-			}
-		}
-		if !*pretend {
-			pathname := filepath.Join(*output, feed.Path)
-			if *verbose {
-				fmt.Printf("# wrote Atom feed to %s\n", pathname)
-			}
-			must(feed.RenderFile(pathname))
-		}
-	}
-
 }
 
 func init() {
