@@ -43,6 +43,8 @@ func Main(args []string, stdin io.Reader, stdout io.Writer) {
                               <section class="body"> = <body>
   -u <url>     site URL with scheme and domain (used to build an Atom feed)
   -v           verbose mode
+
+Synopsis: electrostatic uses mergician to apply a consistent layout to a whole site.
 `)
 	}
 	flags.Parse(args[1:])
