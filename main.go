@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -51,20 +50,7 @@ Synopsis: electrostatic uses mergician to apply a consistent layout to a whole s
 		*verbose = true
 	}
 
-	l := &files.List{}
-	must(fs.WalkDir(
-		os.DirFS(*input),
-		".",
-		func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if d.Type().IsRegular() {
-				l.Add(path)
-			}
-			return nil
-		},
-	))
+	l := must2(files.AllInputs([]string{*input}, []string{}))
 
 	in0 := must2(html.ParseFile(*layout))
 
