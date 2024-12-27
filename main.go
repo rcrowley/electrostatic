@@ -16,33 +16,34 @@ import (
 
 func Main(args []string, stdin io.Reader, stdout io.Writer) {
 	flags := flag.NewFlagSet(args[0], flag.ExitOnError)
-	input := flags.String("i", "", "directory containing input HTML and Markdown documents")
-	layout := flags.String("l", "", "")
-	output := flags.String("o", "", "document root directory where merged HTML documents will be placed")
+	layout := flags.String("l", "", "site layout HTML document")
+	output := flags.String("o", ".", "document root directory where merged HTML documents will be placed")
 	pretend := flags.Bool("p", false, "pretend to process all the inputs but don't write any outputs; implies -v")
 	rules := new(html.Rules)
 	flags.Var(rules, "r", "use a custom rule for merging inputs (overrides all defaults; may be repeated)")
 	verbose := flags.Bool("v", false, "verbose mode")
+	exclude := files.NewStringSliceFlag(flags, "x", "subdirectory of <input> to exclude (may be repeated)")
 	flags.Usage = func() {
-		fmt.Fprint(os.Stderr, `Usage: electrostatic -i <input> -l <layout> -o <output> [-p] [-r <rule>[...]] [-v]
-  -i <input>   directory containing input HTML and Markdown documents
-  -l <layout>  site layout HTML document
-  -o <output>  document root directory where merged HTML documents will be placed
-  -p           pretend to process all the inputs but don't write any outputs; implies -v
-  -r <rule>    use a custom rule for merging inputs (overrides all defaults;
-               may be repeated)
-               each rule is a destination HTML tag with optional attributes,
-               "=" or "+=", and a source HTML tag with optional attributes
-               default rules: <article class="body"> = <body>
-                              <div class="body"> = <body>
-                              <section class="body"> = <body>
-  -v           verbose mode
+		fmt.Fprint(os.Stderr, `Usage: electrostatic -l <layout> [-o <output>] [-p] [-r <rule>[...]] [-v] [-x <exclude>[...]] <input>[...]
+  -l <layout>   site layout HTML document
+  -o <output>   document root directory where merged HTML documents will be placed (defaults to the current working directory)
+  -p            pretend to process all the inputs but don't write any outputs; implies -v
+  -r <rule>     use a custom rule for merging inputs (overrides all defaults;
+                may be repeated)
+                each rule is a destination HTML tag with optional attributes,
+                "=" or "+=", and a source HTML tag with optional attributes
+                default rules: <article class="body"> = <body>
+                               <div class="body"> = <body>
+                               <section class="body"> = <body>
+  -v            verbose mode
+  -x <exclude>  subdirectory of <input> to exclude (may be repeated)
+  <input>       directory containing input HTML and Markdown documents
 
 Synopsis: electrostatic uses mergician to apply a consistent layout to a whole site.
 `)
 	}
 	flags.Parse(args[1:])
-	if *input == "" || *layout == "" || *output == "" || flags.NArg() > 0 {
+	if *layout == "" || flags.NArg() == 0 {
 		flags.Usage()
 		os.Exit(1)
 	}
@@ -50,7 +51,7 @@ Synopsis: electrostatic uses mergician to apply a consistent layout to a whole s
 		*verbose = true
 	}
 
-	l := must2(files.AllInputs([]string{*input}, []string{}))
+	lists := must2(files.AllInputs(flags.Args(), *exclude))
 
 	in0 := must2(html.ParseFile(*layout))
 
@@ -59,30 +60,32 @@ Synopsis: electrostatic uses mergician to apply a consistent layout to a whole s
 	}
 
 	var wg sync.WaitGroup
-	for _, pathname := range l.Pathnames() {
-		inPathname := filepath.Join(*input, pathname)
-		outPathname := filepath.Join(*output, fmt.Sprint(strings.TrimSuffix(pathname, filepath.Ext(pathname)), ".html"))
-		if *verbose {
-			fmt.Printf(
-				"mergician -o %s %s %s\n", // "mergician -o %q %q %q\n",
-				outPathname, *layout, inPathname,
-			)
-		}
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
-			in1 := must2(files.Parse(inPathname))
-			in := must2(html.Merge([]*html.Node{in0, in1}, *rules))
-
-			if *pretend {
-				return
+	for _, list := range lists {
+		for _, path := range list.RelativePaths() {
+			inPath := filepath.Join(list.Root(), path)
+			outPath := filepath.Join(*output, fmt.Sprint(strings.TrimSuffix(path, filepath.Ext(path)), ".html"))
+			if *verbose {
+				fmt.Printf(
+					"mergician -o %s %s %s %s\n",
+					outPath, rules, *layout, inPath,
+				)
 			}
 
-			must(os.MkdirAll(filepath.Dir(outPathname), 0777))
-			must(html.RenderFile(outPathname, in))
-		}()
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+
+				in1 := must2(files.Parse(inPath))
+				in := must2(html.Merge([]*html.Node{in0, in1}, *rules))
+
+				if *pretend {
+					return
+				}
+
+				must(os.MkdirAll(filepath.Dir(outPath), 0777))
+				must(html.RenderFile(outPath, in))
+			}()
+		}
 	}
 	wg.Wait()
 }
