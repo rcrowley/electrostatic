@@ -16,7 +16,7 @@ Installation
 ------------
 
 ```sh
-go get github.com/rcrowley/electrostatic
+go install github.com/rcrowley/electrostatic@latest
 ```
 
 Usage
@@ -40,5 +40,6 @@ See also
 Electrostatic is part of the [Mergician](https://github.com/rcrowley/mergician) suite of tools that manipulate HTML documents:
 
 * [Deadlinks](https://github.com/rcrowley/deadlinks): Scan a document root directory for dead links
+* [Feed](https://github.com/rcrowley/feed): Scan a document root directory to construct an Atom feed
 * [Frag](https://github.com/rcrowley/frag): Extract fragments of HTML documents
 * [Sitesearch](https://github.com/rcrowley/sitesearch): Index a document root directory and serve queries to it in AWS Lambda
