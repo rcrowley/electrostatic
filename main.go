@@ -37,7 +37,7 @@ func Main(args []string, stdin io.Reader, stdout io.Writer) {
                                <section class="body"> = <body>
   -v            verbose mode
   -x <exclude>  subdirectory of <input> to exclude (may be repeated)
-  <input>       directory containing input HTML and Markdown documents
+  <input>       directory containing input HTML and Markdown documents (may be repeated)
 
 Synopsis: electrostatic uses mergician to apply a consistent layout to a whole site.
 `)
