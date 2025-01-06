@@ -1,7 +1,7 @@
 Electrostatic
 =============
 
-HTML is the language of the Web but the Web has moved beyond the bare, unstyled Web of the '90s (and university professors). Visitors to your site expect coherent layouts, visual consistency, navigation. This is the point at which most folks reach for a templating language. [Mergician](https://github.com/rcrowley/mergician) reimagines the often frustrating juxtaposition of HTML and templating language in pure HTML. Instead of rendering a template, merge a content HTML document into a layout HTML document.
+HTML is the language of the Web but the Web has moved beyond the bare, unstyled Web of the '90s (and university professors). Visitors to your site expect coherent layouts, visual consistency, navigation. This is the point at which most folks reach for a templating language. [Mergician](https://github.com/rcrowley/mergician) reimagines the messy mix of HTML and templating language. All you need are HTML documents. Instead of rendering a template, merge a content HTML document into a template HTML document.
 
 Electostatic extends Mergician just that little bit further into a very basic CMS. It processes a whole document root directory, rendering every Markdown document to HTML and wrapping every HTML document in a consistent layout. Someday it'll learn to generate reverse-chronological index pages. Maybe it'll even learn how to manage email subscribers, too.
 
