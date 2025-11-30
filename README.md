@@ -41,6 +41,17 @@ electrostatic -l <layout> -o <output> [-p] [-r <rule>[...]] [-v] [-x <exclude>[.
 * `-x <exclude>`: subdirectory of `<input>` to exclude (may be repeated)
 * `<input>`: directory containing input HTML and Markdown documents (may be repeated)
 
+TODO
+----
+
+It would be slick to include an integration with GNU `source-highlight` to automatically hoist turn blocks like
+
+```html
+<pre id="example.go"></pre>
+```
+
+into the output of `source-highlight -c whatever -f html -s go <"example.go"` as a part of the CMS. Could possibly use the starting contents of the `<pre> to provide further instructions or generalize to something along the lines of `go generate`.
+
 See also
 --------
 

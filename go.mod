@@ -1,8 +1,8 @@
 module github.com/rcrowley/electrostatic
 
-go 1.24.6
+go 1.25.4
 
-require github.com/rcrowley/mergician v0.0.0-20250803034602-2e03e8206018
+require github.com/rcrowley/mergician v0.0.0-20251130073118-e00557126233
 
 require (
 	github.com/yuin/goldmark v1.7.13 // indirect
