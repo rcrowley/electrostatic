@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/rcrowley/mergician/files"
 	"github.com/rcrowley/mergician/html"
@@ -18,6 +19,7 @@ func Main(args []string, stdin io.Reader, stdout io.Writer) {
 	flags := flag.NewFlagSet(args[0], flag.ExitOnError)
 	layout := flags.String("l", "", "site layout HTML document")
 	output := flags.String("o", ".", "document root directory where merged HTML documents will be placed")
+	now := flags.String("n", "", "reference time for scheduling and expiry (\"2006-01-02 15:04:05\" or \"2006-01-02\"; defaults to the current time)")
 	pretend := flags.Bool("p", false, "pretend to process all the inputs but don't write any outputs; implies -v")
 	rules := new(html.Rules)
 	flags.Var(rules, "r", "use a custom rule for merging inputs (overrides all defaults; may be repeated)")
@@ -26,6 +28,8 @@ func Main(args []string, stdin io.Reader, stdout io.Writer) {
 	flags.Usage = func() {
 		fmt.Fprint(os.Stderr, `Usage: electrostatic -l <layout> [-o <output>] [-p] [-r <rule>[...]] [-v] [-x <exclude>[...]] <input>[...]
   -l <layout>   site layout HTML document
+  -n <now>      reference time for scheduling and expiry ("2006-01-02 15:04:05"
+                or "2006-01-02"; defaults to the current time)
   -o <output>   document root directory where merged HTML documents will be placed (defaults to the current working directory)
   -p            pretend to process all the inputs but don't write any outputs; implies -v
   -r <rule>     use a custom rule for merging inputs (overrides all defaults;
@@ -51,6 +55,13 @@ Synopsis: electrostatic uses mergician to apply a consistent layout to a whole s
 		*verbose = true
 	}
 
+	// Resolve the reference time once, here at the edge, so the whole build is
+	// deterministic and every input is judged against the same instant.
+	reference := time.Now()
+	if *now != "" {
+		reference = must2(files.ParseDate(*now))
+	}
+
 	lists := must2(files.AllInputs(flags.Args(), *exclude))
 
 	in0 := must2(html.ParseFile(*layout))
@@ -64,18 +75,29 @@ Synopsis: electrostatic uses mergician to apply a consistent layout to a whole s
 		for _, path := range list.RelativePaths() {
 			inPath := filepath.Join(list.Root(), path)
 			outPath := filepath.Join(*output, fmt.Sprint(strings.TrimSuffix(path, filepath.Ext(path)), ".html"))
-			if *verbose {
-				fmt.Printf(
-					"mergician -o %s %s %s %s\n",
-					outPath, rules, *layout, inPath,
-				)
-			}
 
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
 
 				in1 := must2(files.Parse(inPath))
+
+				// Skip drafts, not-yet-published, and expired pages so they
+				// never reach the document root.
+				if st := files.PublishStatus(in1, reference); st.State != files.Published {
+					if *verbose {
+						reportSkipped(inPath, st)
+					}
+					return
+				}
+
+				if *verbose {
+					fmt.Printf(
+						"mergician -o %s %s %s %s\n",
+						outPath, rules, *layout, inPath,
+					)
+				}
+
 				in := must2(html.Merge([]*html.Node{in0, in1}, *rules))
 
 				if *pretend {
@@ -88,6 +110,20 @@ Synopsis: electrostatic uses mergician to apply a consistent layout to a whole s
 		}
 	}
 	wg.Wait()
+}
+
+// reportSkipped explains, in verbose mode, why a page was left out of the
+// document root, using the same "# ..." comment style as the mergician
+// commands electrostatic prints for the pages it does build.
+func reportSkipped(path string, st files.Status) {
+	switch st.State {
+	case files.Scheduled:
+		fmt.Printf("# scheduled %s: publishes %s\n", path, st.When.Format(time.DateTime))
+	case files.Expired:
+		fmt.Printf("# expired %s: expired %s\n", path, st.When.Format(time.DateTime))
+	default:
+		fmt.Printf("# skipped %s: %s\n", path, st.State)
+	}
 }
 
 func init() {
