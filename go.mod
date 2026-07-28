@@ -1,11 +1,11 @@
 module github.com/rcrowley/electrostatic
 
-go 1.25.4
+go 1.26.5
 
-require github.com/rcrowley/mergician v0.0.0-20251130073118-e00557126233
+require github.com/rcrowley/mergician v0.0.0-20260728204653-d6bcef79538e
 
 require (
-	github.com/yuin/goldmark v1.7.13 // indirect
-	golang.org/x/exp v0.0.0-20250808145144-a408d31f581a // indirect
-	golang.org/x/net v0.43.0 // indirect
+	github.com/yuin/goldmark v1.8.5 // indirect
+	golang.org/x/exp v0.0.0-20260727155853-b88d891fe743 // indirect
+	golang.org/x/net v0.57.0 // indirect
 )
